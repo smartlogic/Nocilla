@@ -9,6 +9,8 @@
 
 - (id)initWithStatusCode:(NSInteger)statusCode;
 - (id)initWithRawResponse:(NSData *)rawResponseData;
+- (id)initWithRawResponse:(NSData *)rawResponseData statusCode:(NSInteger)statusCode headers:(NSDictionary *)headers;
 - (id)initDefaultResponse;
 - (void)setHeader:(NSString *)header value:(NSString *)value;
+- (NSString *)toNocillaDSL;
 @end
