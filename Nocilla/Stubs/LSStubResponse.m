@@ -50,6 +50,16 @@
     return self;
 }
 
+- (id)initWithRawResponse:(NSData *)rawResponseData statusCode:(NSInteger)statusCode headers:(NSDictionary *)headers {
+    self = [super init];
+    if (self) {
+        self.statusCode = statusCode;
+        self.mutableHeaders = [headers mutableCopy];
+        self.body = rawResponseData;
+    }
+    return self;
+}
+
 - (void)setHeader:(NSString *)header value:(NSString *)value {
     [self.mutableHeaders setValue:value forKey:header];
 }
@@ -62,5 +72,29 @@
             self.statusCode,
             self.mutableHeaders,
             self.body];
+}
+
+- (NSString *)toNocillaDSL {
+    NSMutableString *result = [NSMutableString stringWithFormat:@"andReturn(%d)", self.statusCode];
+    if (self.headers.count) {
+        [result appendString:@".\nwithHeaders(@{ "];
+        NSMutableArray *headerElements = [NSMutableArray arrayWithCapacity:self.headers.count];
+
+        NSArray *descriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"" ascending:YES]];
+        NSArray * sortedHeaders = [[self.headers allKeys] sortedArrayUsingDescriptors:descriptors];
+
+        for (NSString * header in sortedHeaders) {
+            NSString *value = [self.headers objectForKey:header];
+            [headerElements addObject:[NSString stringWithFormat:@"@\"%@\": @\"%@\"", header, value]];
+        }
+        [result appendString:[headerElements componentsJoinedByString:@", "]];
+        [result appendString:@" })"];
+    }
+    if (self.body.length) {
+        NSString *escapedBody = [[NSString alloc] initWithData:self.body encoding:NSUTF8StringEncoding];
+        escapedBody = [escapedBody stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
+        [result appendFormat:@".\nwithBody(@\"%@\")", escapedBody];
+    }
+    return [NSString stringWithFormat:@"%@;", result];
 }
 @end
