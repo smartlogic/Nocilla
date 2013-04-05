@@ -8,10 +8,13 @@
 - (id)initWithURL:(NSURL*)URL statusCode:(NSInteger)statusCode headerFields:(NSDictionary*)headerFields requestTime:(double)requestTime;
 @end
 
+static NSURLRequest* unstubbedRequest = nil;
+static NSString *LSFallThroughHeader = @"X-Nocilla-FallThrough";
+
 @implementation LSHTTPStubURLProtocol
 
 + (BOOL)canInitWithRequest:(NSURLRequest *)request {
-    return [@[ @"http", @"https" ] containsObject:request.URL.scheme];
+    return [@[ @"http", @"https" ] containsObject:request.URL.scheme] && ![request isEqual:unstubbedRequest];
 }
 
 + (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request {
@@ -46,8 +49,18 @@
                                                                 requestTime:0];
         body = stubbedResponse.body;
     } else {
+        NSHTTPURLResponse *response = nil;
+        unstubbedRequest = request;
 
-        [NSException raise:@"NocillaUnexpectedRequest" format:@"An unexcepted HTTP request was fired.\n\nUse this snippet to stub the request:\n%@\n", [request toNocillaDSL]];
+        NSData* data = [NSURLConnection sendSynchronousRequest:unstubbedRequest returningResponse:&response error:nil];
+        NSString *returnBody = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        NSLog(@"------------------------------------");
+        NSLog(@"%@", [response allHeaderFields]);
+        NSString *exceptionMessage = [NSString stringWithFormat:@"An unexcepted HTTP request was fired.\n\nUse this snippet to stub the request:\n%@\nandReturn(%d).\nwithHeaders(@\"{ Content-Type\": @\"%@\"}).\nwithBody(@\"%@\");\n", [request toNocillaDSL], response.statusCode, response.allHeaderFields[@"Content-type"], returnBody];
+        NSLog(@"%@", exceptionMessage);
+        NSLog(@"------------------------------------");
+
+        [NSException raise:@"NocillaUnexpectedRequest" format:exceptionMessage];
     }
     [client URLProtocol:self didReceiveResponse:urlResponse
      cacheStoragePolicy:NSURLCacheStorageNotAllowed];
