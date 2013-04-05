@@ -2,6 +2,7 @@
 #import "LSNocilla.h"
 #import "NSURLRequest+LSHTTPRequest.h"
 #import "LSStubRequest.h"
+#import "LSStubResponse.h"
 #import "NSURLRequest+DSL.h"
 
 @interface NSHTTPURLResponse(UndocumentedInitializer)
@@ -9,7 +10,6 @@
 @end
 
 static NSURLRequest* unstubbedRequest = nil;
-static NSString *LSFallThroughHeader = @"X-Nocilla-FallThrough";
 
 @implementation LSHTTPStubURLProtocol
 
@@ -53,14 +53,10 @@ static NSString *LSFallThroughHeader = @"X-Nocilla-FallThrough";
         unstubbedRequest = request;
 
         NSData* data = [NSURLConnection sendSynchronousRequest:unstubbedRequest returningResponse:&response error:nil];
-        NSString *returnBody = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-        NSLog(@"------------------------------------");
-        NSLog(@"%@", [response allHeaderFields]);
-        NSString *exceptionMessage = [NSString stringWithFormat:@"An unexcepted HTTP request was fired.\n\nUse this snippet to stub the request:\n%@\nandReturn(%d).\nwithHeaders(@\"{ Content-Type\": @\"%@\"}).\nwithBody(@\"%@\");\n", [request toNocillaDSL], response.statusCode, response.allHeaderFields[@"Content-type"], returnBody];
-        NSLog(@"%@", exceptionMessage);
-        NSLog(@"------------------------------------");
+        LSStubResponse *suggestedStubResponse = [[LSStubResponse alloc] initWithRawResponse:data statusCode:response.statusCode headers:response.allHeaderFields];
+        NSLog(@"An unexcepted HTTP request was fired.\n\nUse this snippet to stub the request:\n%@\n%@\n", [request toNocillaDSL], [suggestedStubResponse toNocillaDSL]);
 
-        [NSException raise:@"NocillaUnexpectedRequest" format:exceptionMessage];
+        [NSException raise:@"NocillaUnexpectedRequest" format:@"An unexcepted HTTP request was fired.\n\nUse this snippet to stub the request:\n%@\n%@\n", [request toNocillaDSL], [suggestedStubResponse toNocillaDSL]];
     }
     [client URLProtocol:self didReceiveResponse:urlResponse
      cacheStoragePolicy:NSURLCacheStorageNotAllowed];
