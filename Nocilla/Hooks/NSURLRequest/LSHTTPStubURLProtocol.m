@@ -2,16 +2,19 @@
 #import "LSNocilla.h"
 #import "NSURLRequest+LSHTTPRequest.h"
 #import "LSStubRequest.h"
+#import "LSStubResponse.h"
 #import "NSURLRequest+DSL.h"
 
 @interface NSHTTPURLResponse(UndocumentedInitializer)
 - (id)initWithURL:(NSURL*)URL statusCode:(NSInteger)statusCode headerFields:(NSDictionary*)headerFields requestTime:(double)requestTime;
 @end
 
+static NSURLRequest* unstubbedRequest = nil;
+
 @implementation LSHTTPStubURLProtocol
 
 + (BOOL)canInitWithRequest:(NSURLRequest *)request {
-    return [@[ @"http", @"https" ] containsObject:request.URL.scheme];
+    return [@[ @"http", @"https" ] containsObject:request.URL.scheme] && ![request isEqual:unstubbedRequest];
 }
 
 + (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request {
@@ -46,8 +49,14 @@
                                                                 requestTime:0];
         body = stubbedResponse.body;
     } else {
+        NSHTTPURLResponse *response = nil;
+        unstubbedRequest = request;
 
-        [NSException raise:@"NocillaUnexpectedRequest" format:@"An unexcepted HTTP request was fired.\n\nUse this snippet to stub the request:\n%@\n", [request toNocillaDSL]];
+        NSData* data = [NSURLConnection sendSynchronousRequest:unstubbedRequest returningResponse:&response error:nil];
+        LSStubResponse *suggestedStubResponse = [[LSStubResponse alloc] initWithRawResponse:data statusCode:response.statusCode headers:response.allHeaderFields];
+        NSLog(@"An unexcepted HTTP request was fired.\n\nUse this snippet to stub the request:\n%@\n%@\n", [request toNocillaDSL], [suggestedStubResponse toNocillaDSL]);
+
+        [NSException raise:@"NocillaUnexpectedRequest" format:@"An unexcepted HTTP request was fired.\n\nUse this snippet to stub the request:\n%@\n%@\n", [request toNocillaDSL], [suggestedStubResponse toNocillaDSL]];
     }
     [client URLProtocol:self didReceiveResponse:urlResponse
      cacheStoragePolicy:NSURLCacheStorageNotAllowed];
